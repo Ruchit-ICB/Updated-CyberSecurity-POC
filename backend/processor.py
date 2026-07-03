@@ -12,16 +12,16 @@ def process_netflow_data(file_path: str) -> Tuple[Dict[str, Any], List[Dict[str,
     expected_cols = ["src_ip", "dst_ip", "src_port", "dst_port", "protocol", "tos", "packets", "bytes", "flows", "start_time", "end_time"]
     try:
         
-        df_header_check = pl.read_csv(file_path, n_rows=1, truncate_ragged_lines=True)
+        df_header_check = pl.read_csv(file_path, n_rows=1, truncate_ragged_lines=True, ignore_errors=True)
         cols = [c.lower() for c in df_header_check.columns]
         
         intersection = set(cols).intersection({"src_ip", "dst_ip", "src_port", "dst_port", "protocol", "packets", "bytes", "flows"})
         has_headers = len(intersection) > 0
         
         if has_headers:
-            df = pl.read_csv(file_path, truncate_ragged_lines=True)
+            df = pl.read_csv(file_path, truncate_ragged_lines=True, ignore_errors=True)
         else:
-            df = pl.read_csv(file_path, has_header=False, truncate_ragged_lines=True)
+            df = pl.read_csv(file_path, has_header=False, truncate_ragged_lines=True, ignore_errors=True)
         
             rename_map = {df.columns[i]: expected_cols[i] for i in range(min(len(df.columns), len(expected_cols)))}
             df = df.rename(rename_map)

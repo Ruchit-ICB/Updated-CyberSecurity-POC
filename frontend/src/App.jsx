@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   Lock,
   Search,
-  X
+  X,
+  Download
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -33,7 +34,7 @@ import {
   Pie
 } from 'recharts';
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = '/api';
 
 function App() {
   const [stats, setStats] = useState(null);
@@ -163,10 +164,9 @@ function App() {
     new Set(alerts.map(a => a.threat_type).filter(Boolean))
   );
 
-  // Derive charts from filteredAlerts so filters + search affect both charts
+  // Derive charts from filteredAlerts so all filters affect both charts
   const isFiltered = severityFilter !== '' || protocolFilter !== '' || threatTypeFilter !== '' || ipSearch !== '';
 
-  // ML Anomaly Score histogram: bin filteredAlerts by confidence into 20 buckets (0-1)
   const filteredHistogram = useMemo(() => {
     if (!isFiltered) return charts?.histogram || [];
     const bins = Array.from({ length: 20 }, (_, i) => ({
@@ -181,7 +181,6 @@ function App() {
     return bins;
   }, [filteredAlerts, isFiltered, charts]);
 
-  // Threat Incidence Timeline: scale backend time bins proportionally to filter ratio
   const filteredTimeline = useMemo(() => {
     if (!isFiltered) return charts?.threats_over_time || [];
     const ratio = alerts.length > 0 ? filteredAlerts.length / alerts.length : 0;
@@ -190,6 +189,26 @@ function App() {
       threat_count: Math.round(bin.threat_count * ratio)
     }));
   }, [filteredAlerts, isFiltered, charts, alerts.length]);
+
+  // Export currently visible (filtered) alerts as CSV
+  const exportCSV = () => {
+    if (filteredAlerts.length === 0) return;
+    const headers = ['src_ip', 'dst_ip', 'protocol', 'threat_type', 'flows', 'confidence', 'severity', 'evidence'];
+    const rows = filteredAlerts.map(a =>
+      headers.map(h => {
+        const val = h === 'confidence' ? `${Math.round((a[h] || 0) * 100)}%` : (a[h] ?? '');
+        return `"${String(val).replace(/"/g, '""')}"`;
+      }).join(',')
+    );
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `netflow_alerts_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Pie chart colors for protocol distribution
   const PIE_COLORS = ['#8b5cf6', '#3b82f6', '#0d9488', '#f59e0b', '#ef4444', '#10b981'];
@@ -577,8 +596,29 @@ function App() {
                   <ShieldAlert size={20} style={{ color: 'var(--severity-high)' }} />
                   <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Correlated Threat Alerts</h2>
                 </div>
-                <div className="alerts-count">
-                  Showing {filteredAlerts.length} of {alerts.length} aggregated alerts
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div className="alerts-count">
+                    Showing {filteredAlerts.length} of {alerts.length} aggregated alerts
+                  </div>
+                  <button
+                    onClick={exportCSV}
+                    disabled={filteredAlerts.length === 0}
+                    title="Export visible alerts as CSV"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.4rem 0.85rem',
+                      backgroundColor: filteredAlerts.length === 0 ? 'var(--bg-secondary)' : 'var(--accent-blue)',
+                      color: filteredAlerts.length === 0 ? 'var(--text-muted)' : '#fff',
+                      border: 'none', borderRadius: '0.4rem',
+                      fontSize: '0.8rem', fontWeight: 600,
+                      cursor: filteredAlerts.length === 0 ? 'not-allowed' : 'pointer',
+                      transition: 'opacity 0.2s',
+                      opacity: filteredAlerts.length === 0 ? 0.5 : 1,
+                    }}
+                  >
+                    <Download size={13} />
+                    Export CSV
+                  </button>
                 </div>
               </div>
 
@@ -592,32 +632,27 @@ function App() {
                   type="text"
                   placeholder="Search by source or destination IP..."
                   value={ipSearch}
-                  onChange={(e) => setIpSearch(e.target.value)}
+                  onChange={e => setIpSearch(e.target.value)}
                   style={{
-                    width: '100%',
+                    width: '100%', boxSizing: 'border-box',
                     padding: '0.6rem 2.5rem 0.6rem 2.25rem',
                     backgroundColor: 'var(--bg-secondary)',
                     border: '1px solid var(--border-color)',
                     borderRadius: '0.5rem',
                     color: 'var(--text-primary)',
-                    fontSize: '0.875rem',
-                    outline: 'none',
-                    boxSizing: 'border-box',
+                    fontSize: '0.875rem', outline: 'none',
                     transition: 'border-color 0.2s',
                   }}
                   onFocus={e => e.target.style.borderColor = 'var(--accent-blue)'}
                   onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
                 />
                 {ipSearch && (
-                  <button
-                    onClick={() => setIpSearch('')}
-                    style={{
-                      position: 'absolute', right: '0.75rem', top: '50%',
-                      transform: 'translateY(-50%)', background: 'none',
-                      border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
-                      display: 'flex', alignItems: 'center', padding: 0
-                    }}
-                  >
+                  <button onClick={() => setIpSearch('')} style={{
+                    position: 'absolute', right: '0.75rem', top: '50%',
+                    transform: 'translateY(-50%)', background: 'none',
+                    border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+                    display: 'flex', alignItems: 'center', padding: 0
+                  }}>
                     <X size={14} />
                   </button>
                 )}
