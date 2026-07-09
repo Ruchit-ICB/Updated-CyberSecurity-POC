@@ -34,7 +34,7 @@ import {
   Pie
 } from 'recharts';
 
-const BACKEND_URL = '/api';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
 function App() {
   const [stats, setStats] = useState(null);
