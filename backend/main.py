@@ -5,7 +5,9 @@ import os
 import uuid
 from typing import Optional, List
 from processor import process_netflow_data
-
+from metrics import netflow_active_uploads
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
 app = FastAPI(title="NetFlow Threat Detection System API")
 
 # Enable CORS for frontend integration
@@ -47,6 +49,7 @@ async def upload_file(file: UploadFile = File(...)):
     
     file_path = os.path.join(UPLOAD_DIR, f"temp_{uuid.uuid4().hex}_{file.filename}")
     
+    netflow_active_uploads.inc()
     try:
         # Save uploaded file to disk temporarily for Polars ingestion
         with open(file_path, "wb") as buffer:
@@ -73,6 +76,7 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
     finally:
+        netflow_active_uploads.dec()
         # Clean up temporary file
         if os.path.exists(file_path):
             try:
@@ -128,6 +132,10 @@ async def get_stats():
         "stats": db["stats"],
         "charts": db["charts"]
     }
+
+@app.get("/metrics")
+async def metrics():
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 if __name__ == "__main__":
     import uvicorn

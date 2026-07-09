@@ -5,6 +5,12 @@ Analyzes detection results with and without ground truth labels.
 
 from typing import Dict, List, Any, Tuple
 import polars as pl
+from prometheus_client import Counter, Histogram, Gauge
+
+netflow_flows_ingested_total = Counter('netflow_flows_ingested_total', 'Total number of netflow flows ingested')
+netflow_threats_detected_total = Counter('netflow_threats_detected_total', 'Total number of threats detected', ['severity'])
+netflow_processing_seconds = Histogram('netflow_processing_seconds', 'Time spent processing netflow data')
+netflow_active_uploads = Gauge('netflow_active_uploads', 'Number of currently active file uploads')
 
 
 def calculate_detection_metrics(stats: Dict[str, Any], alerts: List[Dict[str, Any]]) -> Dict[str, Any]:

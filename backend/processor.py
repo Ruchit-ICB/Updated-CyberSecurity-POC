@@ -3,6 +3,7 @@ import numpy as np
 from pyod.models.iforest import IForest
 from typing import Dict, List, Tuple, Any
 import time
+from metrics import netflow_flows_ingested_total, netflow_threats_detected_total, netflow_processing_seconds
 
 def process_netflow_data(file_path: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
     
@@ -740,5 +741,11 @@ def process_netflow_data(file_path: str) -> Tuple[Dict[str, Any], List[Dict[str,
         "threats_over_time": line_chart_data
     }
     
-    print(f"Total processing time: {time.time() - t0:.4f}s")
+    processing_time = time.time() - t0
+    netflow_flows_ingested_total.inc(total_flows)
+    netflow_processing_seconds.observe(processing_time)
+    for alert in alerts:
+        netflow_threats_detected_total.labels(severity=alert['severity']).inc()
+    
+    print(f"Total processing time: {processing_time:.4f}s")
     return stats, alerts, charts
