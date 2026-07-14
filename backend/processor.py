@@ -417,15 +417,17 @@ def process_netflow_data(file_path: str) -> Tuple[Dict[str, Any], List[Dict[str,
                 df.group_by('src_ip')
                 .agg([
                     pl.col('dst_ip').n_unique().alias('unique_dst_ips'),
+                    pl.col('dst_ip').unique().alias('dst_ips'),
                     pl.col('protocol').first().alias('protocol')
                 ])
                 .filter(pl.col('unique_dst_ips') >= horizontal_scan_threshold)
             )
             
             for row in horizontal_scan_df.to_dicts():
+                dst_ips = row.get('dst_ips', [])
                 alerts.append({
                     'src_ip': row['src_ip'],
-                    'dst_ip': 'Multiple',
+                    'dst_ip': ', '.join(dst_ips) if isinstance(dst_ips, list) else str(dst_ips),
                     'threat_type': 'Horizontal Scan (Aggregated)',
                     'severity': 'high' if row['unique_dst_ips'] > 500 else 'medium',
                     'protocol': str(row['protocol']).upper(),
@@ -445,15 +447,17 @@ def process_netflow_data(file_path: str) -> Tuple[Dict[str, Any], List[Dict[str,
                 .agg([
                     pl.len().alias('flow_count'),
                     pl.col('dst_ip').n_unique().alias('unique_dsts'),
+                    pl.col('dst_ip').unique().alias('dst_ips'),
                     pl.col('protocol').first().alias('protocol')
                 ])
                 .filter((pl.col('flow_count') > 50) & (pl.col('unique_dsts') > 30))
             )
             
             for row in botnet_df.to_dicts():
+                dst_ips = row.get('dst_ips', [])
                 alerts.append({
                     'src_ip': row['src_ip'],
-                    'dst_ip': 'Multiple',
+                    'dst_ip': ', '.join(dst_ips) if isinstance(dst_ips, list) else str(dst_ips),
                     'threat_type': 'Botnet Activity (High Flow Count)',
                     'severity': 'confirmed',
                     'protocol': str(row['protocol']).upper(),
@@ -473,15 +477,17 @@ def process_netflow_data(file_path: str) -> Tuple[Dict[str, Any], List[Dict[str,
                     icmp_df.group_by('src_ip')
                     .agg([
                         pl.col('dst_ip').n_unique().alias('unique_dst_ips'),
+                        pl.col('dst_ip').unique().alias('dst_ips'),
                         pl.col('packets').sum().alias('total_packets')
                     ])
                     .filter(pl.col('unique_dst_ips') >= 2)
                 )
                 
                 for row in icmp_sweep_df.to_dicts():
+                    dst_ips = row.get('dst_ips', [])
                     alerts.append({
                         'src_ip': row['src_ip'],
-                        'dst_ip': 'Multiple',
+                        'dst_ip': ', '.join(dst_ips) if isinstance(dst_ips, list) else str(dst_ips),
                         'threat_type': 'ICMP Sweep (Aggregated)',
                         'severity': 'confirmed',
                         'protocol': 'ICMP',
@@ -580,7 +586,7 @@ def process_netflow_data(file_path: str) -> Tuple[Dict[str, Any], List[Dict[str,
             'flow_count': flow_count,
             'confidence': round(float(min(confidence, 0.99)), 2),
             'severity': severity,
-            'evidence': alert.get('evidence', 'Rule-based detection')
+            'evidence': alert.get('evidence') or f"Rule-based detection for {threat_type}"
         })
 
     # Cross-threat IP escalation: if a src_ip appears in 2+ distinct threat types,

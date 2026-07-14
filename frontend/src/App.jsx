@@ -36,6 +36,106 @@ import {
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
+const DestinationIPCell = ({ dstIp }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!dstIp) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
+
+  // Split by comma
+  const ips = dstIp.split(',').map(ip => ip.trim()).filter(Boolean);
+
+  if (ips.length <= 1) {
+    return <span style={{ fontFamily: 'monospace' }}>{dstIp}</span>;
+  }
+
+  if (expanded) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '180px' }}>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.25rem',
+          maxHeight: '110px',
+          overflowY: 'auto',
+          padding: '2px',
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          borderRadius: '4px',
+          border: '1px solid var(--border-color)'
+        }}>
+          {ips.map((ip, idx) => (
+            <span key={idx} style={{
+              fontFamily: 'monospace',
+              fontSize: '0.75rem',
+              padding: '0.1rem 0.35rem',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.04)',
+              borderRadius: '4px',
+              color: 'var(--text-primary)'
+            }}>{ip}</span>
+          ))}
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--accent-blue)',
+            cursor: 'pointer',
+            fontSize: '0.75rem',
+            textAlign: 'left',
+            padding: 0,
+            width: 'fit-content',
+            textDecoration: 'underline'
+          }}
+        >
+          Show less
+        </button>
+      </div>
+    );
+  }
+
+  const visibleIps = ips.slice(0, 3);
+  const remaining = ips.length - 3;
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.25rem', minWidth: '180px' }}>
+      {visibleIps.map((ip, idx) => (
+        <span key={idx} style={{
+          fontFamily: 'monospace',
+          fontSize: '0.75rem',
+          padding: '0.1rem 0.35rem',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.04)',
+          borderRadius: '4px',
+          color: 'var(--text-primary)'
+        }}>{ip}</span>
+      ))}
+      {remaining > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+          style={{
+            background: 'rgba(59, 130, 246, 0.15)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            color: '#60a5fa',
+            borderRadius: '4px',
+            fontSize: '0.7rem',
+            padding: '0.1rem 0.35rem',
+            cursor: 'pointer',
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            transition: 'background 0.2s',
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.25)'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'}
+        >
+          +{remaining} more
+        </button>
+      )}
+    </div>
+  );
+};
+
 function App() {
   const [stats, setStats] = useState(null);
   const [charts, setCharts] = useState(null);
@@ -196,7 +296,8 @@ function App() {
     const headers = ['src_ip', 'dst_ip', 'protocol', 'threat_type', 'flows', 'confidence', 'severity', 'evidence'];
     const rows = filteredAlerts.map(a =>
       headers.map(h => {
-        const val = h === 'confidence' ? `${Math.round((a[h] || 0) * 100)}%` : (a[h] ?? '');
+        const key = h === 'flows' ? 'flow_count' : h;
+        const val = key === 'confidence' ? `${Math.round((a[key] || 0) * 100)}%` : (a[key] ?? '');
         return `"${String(val).replace(/"/g, '""')}"`;
       }).join(',')
     );
@@ -679,7 +780,7 @@ function App() {
                         return (
                           <tr key={i} className={rowClass}>
                             <td style={{ fontWeight: 600 }}>{alert.src_ip}</td>
-                            <td>{alert.dst_ip}</td>
+                            <td><DestinationIPCell dstIp={alert.dst_ip} /></td>
                             <td><span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', textTransform: 'uppercase' }}>{alert.protocol}</span></td>
                             <td>{alert.threat_type}</td>
                             <td style={{ color: 'var(--text-secondary)' }}>{alert.flow_count}</td>
